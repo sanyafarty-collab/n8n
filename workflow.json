@@ -1,0 +1,93 @@
+{
+  "name": "Telegram to Gemma Text Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "credentialType": "telegramApi",
+        "updates": ["message"]
+      },
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [-200, 0],
+      "credentials": {
+        "telegramApi": {
+          "botToken": "{{ $env.TELEGRAM_BOT_TOKEN }}"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-inference.huggingface.co/models/google/gemma-2-2b",
+        "authentication": "genericCredentialType",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.HUGGINGFACE_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "jsonParameters": true,
+        "sendBody": true,
+        "bodyParametersJson": "{\"inputs\": \"{{ $json.body.message.text }}\", \"parameters\": {\"max_new_tokens\": 100, \"temperature\": 0.7}, \"options\": {\"wait_for_model\": true}}"
+      },
+      "name": "Hugging Face Gemma Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [20, 0]
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "credentialType": "telegramApi",
+        "chatId": "{{ $json.body.message.chat.id }}",
+        "text": "{{ $node[\"Hugging Face Gemma Request\"].json[0].generated_text }}",
+        "additionalFields": {}
+      },
+      "name": "Telegram Response",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [240, 0],
+      "credentials": {
+        "telegramApi": {
+          "botToken": "{{ $env.TELEGRAM_BOT_TOKEN }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Hugging Face Gemma Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hugging Face Gemma Request": {
+      "main": [
+        [
+          {
+            "node": "Telegram Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true
+}
